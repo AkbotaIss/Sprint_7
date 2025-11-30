@@ -1,49 +1,41 @@
 import requests
 import pytest
+import allure
 
-BASE_URL = "https://qa-scooter.praktikum-services.ru"
-
-
-def get_base_order_payload():
-    """Базовое тело заказа без учёта цвета."""
-    return {
-        "firstName": "Naruto",
-        "lastName": "Uzumaki",
-        "address": "Konoha, 142 apt.",
-        "metroStation": 4,
-        "phone": "+7 800 355 35 35",
-        "rentTime": 5,
-        "deliveryDate": "2025-12-01",
-        "comment": "Saske, come back to Konoha",
-
-    }
+from urls import CREATE_ORDER_URL
+from data import BASE_ORDER_PAYLOAD
 
 
+@allure.title("Создание заказа с разными вариантами цвета")
 @pytest.mark.parametrize(
-    "colors",
+    "case_name,payload",
     [
-        ["BLACK"],          # один цвет
-        ["GREY"],           # один цвет
-        ["BLACK", "GREY"],  # оба цвета
-        None,               # цвет не указан вообще
-    ]
+        (
+            "один цвет BLACK",
+            {**BASE_ORDER_PAYLOAD, "color": ["BLACK"]},
+        ),
+        (
+            "один цвет GREY",
+            {**BASE_ORDER_PAYLOAD, "color": ["GREY"]},
+        ),
+        (
+            "оба цвета BLACK и GREY",
+            {**BASE_ORDER_PAYLOAD, "color": ["BLACK", "GREY"]},
+        ),
+        (
+            "без указания цвета",
+            BASE_ORDER_PAYLOAD,
+        ),
+    ],
 )
-def test_create_order_with_different_colors(colors):
-    payload = get_base_order_payload()
+def test_create_order_with_different_colors(case_name, payload):
+    with allure.step(f"Отправляем запрос создания заказа: {case_name}"):
+        response = requests.post(CREATE_ORDER_URL, json=payload)
 
+    with allure.step("Проверяем успешный статус-код и наличие track"):
+        assert response.status_code in [200, 201]
 
-    if colors is not None:
-        payload["color"] = colors
-
-
-    response = requests.post(f"{BASE_URL}/api/v1/orders", json=payload)
-
-
-    assert response.status_code in [200, 201]
-
-    body = response.json()
-
-
-    assert "track" in body
-    assert isinstance(body["track"], int)
-    assert body["track"] > 0
+        body = response.json()
+        assert "track" in body
+        assert isinstance(body["track"], int)
+        assert body["track"] > 0
